@@ -39,8 +39,23 @@ jobs:
           chmod +x ./scripts/build.sh
           ./scripts/build.sh ${{ matrix.target }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         with:
-          name: smartfan-${{ matrix.target }}
-          path: dist/smartfan-${{ matrix.target == 'x86_64-unknown-linux-musl' && 'linux' || 'windows' }}.zip
+          tag_name: ${{ github.sha }}
+          release_name: Release ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/smartfan-${{ matrix.target == 'x86_64-unknown-linux-musl' && 'linux' || 'windows' }}.zip
+          asset_name: smartfan-${{ matrix.target == 'x86_64-unknown-linux-musl' && 'linux' || 'windows' }}.zip
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
