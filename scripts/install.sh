@@ -9,12 +9,9 @@ if ! command -v ipmitool &>/dev/null;then
     apt install -y ipmitool
 fi
 
-if ! command -v python3 &>/dev/null;then
-    apt install -y python3
-fi
-
 ## get current path
 current_path=$(cd `dirname $0`;pwd)
+chmod +x $current_path/smartfan
 
 service_file="/etc/systemd/system/smartfan.service"
 cat > $service_file <<EOF
@@ -24,7 +21,7 @@ After=network.target
 Requires=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 $current_path/hr650x_auto_fan.py in-band
+ExecStart=$current_path/smartfan in-band
 WorkingDirectory=$current_path
 Restart=always
 RestartSec=5
