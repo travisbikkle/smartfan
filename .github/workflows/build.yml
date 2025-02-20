@@ -1,0 +1,41 @@
+name: Build and Package
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-musl, x86_64-pc-windows-gnu]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install dependencies
+        run: sudo apt-get install -y musl-tools mingw-w64
+
+      - name: Build
+        run: |
+          ./scripts/build.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: smartfan-${{ matrix.target }}
+          path: dist/smartfan-${{ matrix.target == 'x86_64-unknown-linux-musl' && 'linux' || 'windows' }}.zip
