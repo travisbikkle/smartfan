@@ -33,6 +33,7 @@ jobs:
 
       - name: Build
         run: |
+          chmod +x ./scripts/build.sh
           ./scripts/build.sh
 
       - name: Upload artifacts
