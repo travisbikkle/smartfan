@@ -33,4 +33,5 @@ EOF
 
 chmod 644 $service_file
 systemctl enable smartfan
-systemctl start smartfan
+systemctl daemon-reload
+systemctl restart smartfan
