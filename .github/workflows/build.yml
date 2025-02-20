@@ -36,7 +36,7 @@ jobs:
           ./scripts/build.sh
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: smartfan-${{ matrix.target }}
           path: dist/smartfan-${{ matrix.target == 'x86_64-unknown-linux-musl' && 'linux' || 'windows' }}.zip

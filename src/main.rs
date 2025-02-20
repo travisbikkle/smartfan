@@ -30,12 +30,19 @@ fn get_timestamp() -> String {
 }
 
 fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> Option<(f64, u8)> {
-    let cmd = format!("{} sensor | grep CPU | grep Temp", ipmi_tool_cmd);
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
-        .output()
-        .expect("Failed to execute command");
+    let cmd = format!("{} sensor", ipmi_tool_cmd);
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(&["/C", &cmd])
+            .output()
+            .expect("Failed to execute command")
+    } else {
+        Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .output()
+            .expect("Failed to execute command")
+    };
 
     if !output.status.success() {
         eprintln!(
@@ -51,8 +58,12 @@ fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> Option<(f64, u8)> {
     let mut temperatures = Vec::new();
     let mut cpu_num = 2;
 
+    // CPU1_Temp        | 34.000     | degrees C  | ok    | na        | na        | na        | 93.000    | 100.000   | 105.000   
+    // CPU2_Temp        | 0.000      | degrees C  | ok    | na        | na        | na        | 100.000   | 102.000   | 104.000   
+    // CPU1_VR_Temp     | 30.000     | degrees C  | ok    | na        | na        | na        | 112.000   | 123.000   | 133.000   
+    // CPU2_VR_Temp     | 15.000     | degrees C  | ok    | na        | na        | na        | 112.000   | 123.000   | 133.000   
     for line in lines {
-        if line.is_empty() {
+        if line.is_empty() || !line.contains("CPU") || !line.contains("Temp") {
             continue;
         }
 
@@ -121,11 +132,18 @@ fn set_fan_speed(speed: u8, ipmi_tool_cmd: &str, cpu_num: u8, cpu2_fan_speed_set
         format!("{} raw 0x2e 0x30 00 00 {:02x}", ipmi_tool_cmd, speed)
     };
 
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
-        .output()
-        .expect("Failed to execute command");
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(&["/C", &cmd])
+            .output()
+            .expect("Failed to execute command")
+    } else {
+        Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .output()
+            .expect("Failed to execute command")
+    };
 
     if !output.status.success() {
         eprintln!(
