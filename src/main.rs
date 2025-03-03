@@ -194,7 +194,6 @@ fn main() {
     let mut cpu2_fan_speed_set = false;
 
     loop {
-        println!("{}", get_timestamp());
         if let Some((temp, cpu_num)) = get_temperature_and_cpu_num(&ipmi_tool_cmd) {
             let speed = get_fan_speed(temp, &config.fan_speeds);
             if set_fan_speed(speed, &ipmi_tool_cmd, cpu_num, &mut cpu2_fan_speed_set) {
