@@ -1,8 +1,5 @@
-use rand::{
-    distributions::{Distribution, Uniform},
-    rngs::ThreadRng,
-};
 use ratatui::widgets::ListState;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 const TASKS: [&str; 24] = [
     "Item1", "Item2", "Item3", "Item4", "Item5", "Item6", "Item7", "Item8", "Item9", "Item10",
@@ -65,28 +62,6 @@ const EVENTS: [(&str, u64); 24] = [
     ("B23", 3),
     ("B24", 5),
 ];
-
-#[derive(Clone)]
-pub struct RandomSignal {
-    distribution: Uniform<u64>,
-    rng: ThreadRng,
-}
-
-impl RandomSignal {
-    pub fn new(lower: u64, upper: u64) -> Self {
-        Self {
-            distribution: Uniform::new(lower, upper),
-            rng: rand::thread_rng(),
-        }
-    }
-}
-
-impl Iterator for RandomSignal {
-    type Item = u64;
-    fn next(&mut self) -> Option<u64> {
-        Some(self.distribution.sample(&mut self.rng))
-    }
-}
 
 #[derive(Clone)]
 pub struct SinSignal {
@@ -225,19 +200,23 @@ pub struct App<'a> {
     pub tabs: TabsState<'a>,
     pub show_chart: bool,
     pub progress: f64,
-    pub sparkline: Signal<RandomSignal>,
     pub tasks: StatefulList<&'a str>,
     pub logs: StatefulList<(&'a str, &'a str)>,
     pub signals: Signals,
     pub barchart: Vec<(&'a str, u64)>,
     pub servers: Vec<Server<'a>>,
     pub enhanced_graphics: bool,
+    pub event_receiver_from_ipmi: Receiver<crate::Message>,
+    pub ui_event_sender: Sender<crate::UIMessage>,
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str, enhanced_graphics: bool) -> Self {
-        let mut rand_signal = RandomSignal::new(0, 100);
-        let sparkline_points = rand_signal.by_ref().take(300).collect();
+    pub fn new(
+        title: &'a str,
+        enhanced_graphics: bool,
+        event_receiver_from_ipmi: Receiver<crate::Message>,
+        ui_event_sender: Sender<crate::UIMessage>,
+    ) -> Self {
         let mut sin_signal = SinSignal::new(0.2, 3.0, 18.0);
         let sin1_points = sin_signal.by_ref().take(100).collect();
         let mut sin_signal2 = SinSignal::new(0.1, 2.0, 10.0);
@@ -248,11 +227,6 @@ impl<'a> App<'a> {
             tabs: TabsState::new(vec!["Tab0", "Tab1", "Tab2"]),
             show_chart: true,
             progress: 0.0,
-            sparkline: Signal {
-                source: rand_signal,
-                points: sparkline_points,
-                tick_rate: 1,
-            },
             tasks: StatefulList::with_items(TASKS.to_vec()),
             logs: StatefulList::with_items(LOGS.to_vec()),
             signals: Signals {
@@ -296,6 +270,8 @@ impl<'a> App<'a> {
                 },
             ],
             enhanced_graphics,
+            event_receiver_from_ipmi,
+            ui_event_sender,
         }
     }
 
@@ -334,7 +310,6 @@ impl<'a> App<'a> {
             self.progress = 0.0;
         }
 
-        self.sparkline.on_tick();
         self.signals.on_tick();
 
         let log = self.logs.items.pop().unwrap();
