@@ -8,6 +8,7 @@ pub mod config;
 pub mod fan;
 pub mod tui;
 pub mod constants;
+
 pub use constants::*;
 
 pub fn load_config(config_path: &str) -> config::Config {
