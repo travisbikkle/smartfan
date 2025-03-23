@@ -93,7 +93,7 @@ def get_fan_speed(temp, fan_speeds):
 
 def main():
     global in_band
-    if len(sys.argv) > 1 and sys.argv[1] == "in-band":
+    if len(sys.argv) > 1 and sys.argv[1] == IN_BAND:
         in_band = True
         print("running with in-band mode")
     else:

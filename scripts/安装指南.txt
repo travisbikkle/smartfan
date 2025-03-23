@@ -1,0 +1,46 @@
+一 什么是带内模式，带外模式
+
+带内模式 (in-band) 不需要你知道服务器BMC的ip地址，用户名和密码。
+
+带外模式 (out-band) 需要知道以上信息。
+
+二 安装指导
+
+Debian/Ubuntu 安装指导
+==========
+1. 使用ssh工具如（xshell/xftp，moba xterm等）登录服务器，将压缩包 smartfan.zip 上传到服务器用户家目录，如 /home/test
+2. 解压unzip解压缩
+    unzip smartfan.zip
+3. 进入 smartfan 文件夹，执行
+    sh install.sh
+
+Windows安装指导
+============
+1. 将 smartfan.zip 拷贝到服务器
+2. 解压缩
+3. 双击install.bat，根据提示安装
+4. 如果你选择带内模式，需要自行准备ipmi驱动
+5. 进入安装目录（C:\Users\xxxxxxxx\smartfan），打开cmd，执行.\smartfan.exe，查看输出信息，是否正常
+
+
+正常的输出信息为：
+
+
+正常安装后，下次开机会自动启动，开始调整风扇转速。
+
+三 怎么自定义风扇转速
+找到安装目录的HR650X.yaml，修改各个温度区间希望的风扇转速。
+
+  - temp_range: [45, 50]
+    speed: 20
+
+这两行的意思是，温度在45到50度之间，风扇转速为20%。
+
+
+Debian/Ubuntu
+===========
+解压缩后的文件夹\HR650X.yaml
+
+Windows
+======
+家目录\smartfan\HR650.yaml
