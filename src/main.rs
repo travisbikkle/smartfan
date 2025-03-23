@@ -113,16 +113,22 @@ fn set_fan_speed(speed: u8, ipmi_tool_cmd: &str, cpu_num: u8, cpu2_fan_speed_set
         cpu_num, cpu2_fan_speed_set
     );
 
+    let mut delimiter = if cfg!(target_os = "windows") {
+        "&"
+    } else {
+        ";"
+    };
+
     let mut cmd = if cpu_num == 1 {
         let mut cmd = format!(
-            "{} raw 0x2e 0x30 00 01 {}; {} raw 0x2e 0x30 00 02 {}; {} raw 0x2e 0x30 00 03 {}",
-            ipmi_tool_cmd, speed, ipmi_tool_cmd, speed, ipmi_tool_cmd, speed
+            "{} raw 0x2e 0x30 00 01 {}{} {} raw 0x2e 0x30 00 02 {}{} {} raw 0x2e 0x30 00 03 {}",
+            ipmi_tool_cmd, speed, delimiter, ipmi_tool_cmd, speed, delimiter, ipmi_tool_cmd, speed
         );
 
         if !*cpu2_fan_speed_set {
             cmd.push_str(&format!(
-                "; {} raw 0x2e 0x30 00 04 02; {} raw 0x2e 0x30 00 05 02; {} raw 0x2e 0x30 00 06 02",
-                ipmi_tool_cmd, ipmi_tool_cmd, ipmi_tool_cmd
+                "{} {} raw 0x2e 0x30 00 04 02{} {} raw 0x2e 0x30 00 05 02{} {} raw 0x2e 0x30 00 06 02",
+                delimiter, ipmi_tool_cmd, delimiter, ipmi_tool_cmd, delimiter, ipmi_tool_cmd
             ));
             *cpu2_fan_speed_set = true;
         }
