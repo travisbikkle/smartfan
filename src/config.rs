@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    pub mode: String,
+    pub server_model: String,
     pub ipmi: IpmiHostInfo,
     pub fan_speeds: Vec<FanSpeed>,
 }

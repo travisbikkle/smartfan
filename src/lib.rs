@@ -52,19 +52,22 @@ pub fn load_config(config_path: &str) -> config::Config {
 }
 
 pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UIMessage>) {
-    let in_band = false;
-    // if in_band {
-    //     log::info!("Running with in-band mode");
-    // } else {
-    //     log::info!("Running with out-band mode");
-    // }
+    let mut in_band = false;
 
-    let config_path = format!("{}/HR650X.yaml", std::env::current_dir().unwrap().display());
+    let config_path = format!("{}/config.yaml", std::env::current_dir().unwrap().display());
     if !std::fs::metadata(config_path.clone()).is_ok() {
         send_to_ui.send(Message::build_log(Level::Error, format!("{} not exists.", config_path))).await.expect("send message to ui successfully");
         return;
     }
     let config: config::Config = load_config(&config_path);
+    if config.mode.to_lowercase() == "in-band" {
+        in_band = true;
+    } else {
+        if config.ipmi.username.is_empty() || config.ipmi.password.is_empty() || config.ipmi.host.is_empty() {
+            send_to_ui.send(Message::build_log(Level::Error, "必须配置用户名、密码和BMC主机地址，才能使用out-band模式/username, password and host must be set to use out-band mode.".to_string())).await.expect("send message to ui successfully");
+            return;
+        }
+    }
 
     let ipmi_tool_cmd = if in_band {
         "ipmitool".to_string()
@@ -78,7 +81,6 @@ pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UI
     let mut cpu2_fan_speed_set = false;
 
     loop {
-
         match fan::get_all_sensor_data(&ipmi_tool_cmd) {
             Ok(sensor_data) => {
                 let now = Local::now();
@@ -114,7 +116,7 @@ mod tests {
     #[test]
     fn test_load_config() {
         let config_path = format!(
-            "{}/{}/HR650X.yaml",
+            "{}/{}/config.yaml",
             std::env::current_dir().unwrap().display(),
             "scripts"
         );
