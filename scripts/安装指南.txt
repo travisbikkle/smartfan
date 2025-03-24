@@ -4,6 +4,10 @@
 
 带外模式 (out-band) 需要知道以上信息。
 
+TODO: $env:HOME
+
+
+
 二 安装指导
 
 Debian/Ubuntu 安装指导

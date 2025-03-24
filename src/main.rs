@@ -1,10 +1,15 @@
 use log::Level;
 use std::error::Error;
 use tokio::sync::mpsc;
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_level(Level::Error).unwrap();
+
+    // ipmitool enterprise-numbers -> ${HOME}/.local/usr/share/misc/enterprise-numbers
+    #[cfg(target_os = "windows")]
+    env::set_var("HOME", env::var("USERPROFILE").unwrap());
 
     let (tx, rx) = mpsc::channel::<smartfan::Message>(100);
     let (ui_tx, ui_rx) = mpsc::channel::<smartfan::UIMessage>(100);

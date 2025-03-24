@@ -1,9 +1,9 @@
 mode: in-band
 server_model: Lenovo HR650X
 ipmi:
-  host: 192.168.0.188
+  host: changeme
   username: albert
-  password: km717070
+  password: changeme
 fan_speeds:
   - temp_range: [0, 5] # when the system is off
     speed: 2
