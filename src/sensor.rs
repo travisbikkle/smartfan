@@ -133,7 +133,7 @@ pub fn set_fan_speed(
 
         if !*cpu2_fan_speed_set {
             cmd.push_str(&format!(
-                "{} {} raw 0x2e 0x30 00 04 02{} {} raw 0x2e 0x30 00 05 02{} {} raw 0x2e 0x30 00 06 02",
+                "{} {} raw 0x2e 0x30 00 04 02 {}{} raw 0x2e 0x30 00 05 02 {} {} raw 0x2e 0x30 00 06 02",
                 delimiter, ipmi_tool_cmd, delimiter, ipmi_tool_cmd, delimiter, ipmi_tool_cmd
             ));
             *cpu2_fan_speed_set = true;
