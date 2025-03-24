@@ -13,6 +13,8 @@ fi
 current_path=$(cd `dirname $0`;pwd)
 chmod +x $current_path/smartfan
 
+sed "s/out-band/in-band/g" -i "${current_path}/config.yaml"
+
 service_file="/etc/systemd/system/smartfan.service"
 cat > $service_file <<EOF
 [Unit]
@@ -21,7 +23,7 @@ After=network.target
 Requires=network.target
 
 [Service]
-ExecStart=$current_path/smartfan in-band
+ExecStart=$current_path/smartfan
 WorkingDirectory=$current_path
 Restart=always
 RestartSec=5

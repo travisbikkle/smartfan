@@ -1,4 +1,4 @@
-mode: in-band
+mode: out-band
 server_model: Lenovo HR650X
 ipmi:
   host: changeme

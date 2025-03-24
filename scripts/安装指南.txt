@@ -1,45 +1,34 @@
-一 什么是带内模式，带外模式
+系统要求：Linux（ubuntu，debian），windows
+注意：
+	1. 只支持联想HR650X。如果需要支持更多服务器，可以定制。
+	2. linux可以无需BMC地址及用户名、密码，也就是这个页面的登录信息。但是windows必须要。
+	3. 如果你使用的是windows，需要在你本机ping你的bmc地址。如果可以ping通，那么提供用户名、密码就可以安装在服务器上控制风扇。如果不能ping通，那么你只能将这个软件安装到局域网内的另一台电脑上，服务器和电脑必须一起开机才能控制风扇转速
+	4. linux理论支持所有发行版，但是目前我只写了debian和ubuntu的自动安装脚本。如果你的系统不是这两个，也不影响，可以联系我手动安装
+
+一 带内模式、带外模式有什么区别
 
 带内模式 (in-band) 不需要你知道服务器BMC的ip地址，用户名和密码。
-
 带外模式 (out-band) 需要知道以上信息。
 
-TODO: $env:HOME
-
-
-
-二 安装指导
-
-Debian/Ubuntu 安装指导
-==========
-1. 使用ssh工具如（xshell/xftp，moba xterm等）登录服务器，将压缩包 smartfan.zip 上传到服务器用户家目录，如 /home/test
+二 Debian/Ubuntu 安装指导
+1. 使用ssh工具如（xshell/xftp，moba xterm等）登录服务器，将压缩包 smartfan_linux.zip 上传到服务器用户家目录，如 /home/test
 2. 解压unzip解压缩
-    unzip smartfan.zip
+    unzip smartfan_linux.zip
 3. 进入 smartfan 文件夹，执行
     sh install.sh
 
-Windows安装指导
-============
-1. 将 smartfan.zip 拷贝到服务器
-2. 解压缩
-3. 双击install.bat，根据提示安装
-4. 如果你选择带内模式，需要自行准备ipmi驱动
-5. 进入安装目录（C:\Users\xxxxxxxx\smartfan），打开cmd，执行.\smartfan.exe，查看输出信息，是否正常
+三 Windows安装指导
+1. 将 smartfan_setup.exe 拷贝到服务器
+2. 双击安装，勾选创建桌面快捷方式
+3. 安装完成后，右键点击桌面快捷方式，进入安装目录，用记事本修改config.yaml，将正确的BMC地址，用户名，密码填入，mode改为out-band
 
-
-正常的输出信息为：
-
-
-正常安装后，下次开机会自动启动，开始调整风扇转速。
-
-三 怎么自定义风扇转速
-找到安装目录的HR650X.yaml，修改各个温度区间希望的风扇转速。
+四 怎么自定义风扇转速
+找到安装目录的config.yaml，修改各个温度区间希望的风扇转速。
 
   - temp_range: [45, 50]
     speed: 20
 
 这两行的意思是，温度在45到50度之间，风扇转速为20%。
-
 
 Debian/Ubuntu
 ===========
@@ -47,4 +36,4 @@ Debian/Ubuntu
 
 Windows
 ======
-家目录\smartfan\HR650.yaml
+安装目录\smartfan\HR650.yaml
