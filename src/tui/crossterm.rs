@@ -30,7 +30,7 @@ pub fn run(
 
     // create app and run it
     let app = App::new(
-        "Crossterm Demo",
+        "灵蛛smartfan",
         enhanced_graphics,
         event_receiver_from_ipmi,
         ui_event_sender,
@@ -55,9 +55,8 @@ pub fn run(
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Result<()> {
     let mut last_tick = Instant::now();
-    let tick_rate = std::time::Duration::from_millis(2500);
+    let tick_rate = std::time::Duration::from_millis(1000);
     loop {
-
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
@@ -80,15 +79,35 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Resu
             match app.event_receiver_from_ipmi.try_recv() {
                 Ok(msg) => {
                     match msg {
-                        Message::Log(l, m) => {
-                            app.logs.items.insert(0, (l, m));
+                        Message::Log(time, l, m) => {
+                            app.logs.items.insert(0, (l, format!("{} {}", time, m)));
                         },
-                        Message::Ipmi(temp, speed) => {
-                            let now = Local::now();
-                            // 将时间格式化为小时:分钟:秒
-                            let time_str = now.format("%H:%M:%S").to_string();
-                            app.barchart_temp.insert(0, (time_str.clone(), temp as u64));
-                            app.barchart_speed.insert(0, (time_str, speed as u64));
+                        Message::GotCpuAndFansSpeed(time_str, (cpu, max_cpu), fans) => {
+                            app.barchart_speed.clear();
+                            fans
+                                .iter()
+                                .for_each(|(fan_name, speed)|app.barchart_temp.push((fan_name.clone(), *speed as u64)))
+                        }
+                        Message::SetFanSpeed(time_str, temp, speed) => {
+                            let max = app.signals.window[1] - app.signals.window[0];
+                            if app.signals.data1.len() > max as usize {
+                                app.signals.data1.remove(0);
+                            }
+                            app.signals.data1.push((time_str.clone(), temp));
+
+                            if app.signals.data2.len() > max as usize {
+                                app.signals.data2.remove(0);
+                            }
+                            app.signals.data2.push((time_str.clone(), speed as f64));
+
+                            if app.speed_list.items.len() > 50 {
+                                app.speed_list.items.pop();
+                            }
+                            app.speed_list.items.insert(0, (time_str.clone(), speed));
+                            if app.temp_list.items.len() > 50 {
+                                app.temp_list.items.pop();
+                            }
+                            app.temp_list.items.insert(0, (time_str.clone(), temp));
                         },
                         _ => {}
                     }

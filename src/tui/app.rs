@@ -1,3 +1,4 @@
+use std::ops::Add;
 use ratatui::widgets::ListState;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -63,34 +64,6 @@ const EVENTS: [(&str, u64); 24] = [
     ("B24", 5),
 ];
 
-#[derive(Clone)]
-pub struct SinSignal {
-    x: f64,
-    interval: f64,
-    period: f64,
-    scale: f64,
-}
-
-impl SinSignal {
-    pub const fn new(interval: f64, period: f64, scale: f64) -> Self {
-        Self {
-            x: 0.0,
-            interval,
-            period,
-            scale,
-        }
-    }
-}
-
-impl Iterator for SinSignal {
-    type Item = (f64, f64);
-    fn next(&mut self) -> Option<Self::Item> {
-        let point = (self.x, (self.x * 1.0 / self.period).sin() * self.scale);
-        self.x += self.interval;
-        Some(point)
-    }
-}
-
 pub struct TabsState<'a> {
     pub titles: Vec<&'a str>,
     pub index: usize,
@@ -155,33 +128,14 @@ impl<T> StatefulList<T> {
     }
 }
 
-pub struct Signal<S: Iterator> {
-    source: S,
-    pub points: Vec<S::Item>,
-    tick_rate: usize,
-}
-
-impl<S> Signal<S>
-where
-    S: Iterator,
-{
-    fn on_tick(&mut self) {
-        self.points.drain(0..self.tick_rate);
-        self.points
-            .extend(self.source.by_ref().take(self.tick_rate));
-    }
-}
-
 pub struct Signals {
-    pub sin1: Signal<SinSignal>,
-    pub sin2: Signal<SinSignal>,
+    pub data1: Vec<(String, f64)>,
+    pub data2: Vec<(String, f64)>,
     pub window: [f64; 2],
 }
 
 impl Signals {
     fn on_tick(&mut self) {
-        self.sin1.on_tick();
-        self.sin2.on_tick();
         self.window[0] += 1.0;
         self.window[1] += 1.0;
     }
@@ -202,6 +156,8 @@ pub struct App<'a> {
     pub progress: f64,
     pub tasks: StatefulList<&'a str>,
     pub logs: StatefulList<(log::Level, String)>,
+    pub speed_list: StatefulList<(String, u8)>,
+    pub temp_list: StatefulList<(String, f64)>,
     pub signals: Signals,
     pub barchart_speed: Vec<(String, u64)>,
     pub barchart_temp: Vec<(String, u64)>,
@@ -218,31 +174,21 @@ impl<'a> App<'a> {
         event_receiver_from_ipmi: Receiver<crate::Message>,
         ui_event_sender: Sender<crate::UIMessage>,
     ) -> Self {
-        let mut sin_signal = SinSignal::new(0.2, 3.0, 18.0);
-        let sin1_points = sin_signal.by_ref().take(100).collect();
-        let mut sin_signal2 = SinSignal::new(0.1, 2.0, 10.0);
-        let sin2_points = sin_signal2.by_ref().take(200).collect();
         App {
             title,
             should_quit: false,
-            tabs: TabsState::new(vec!["Tab0", "Tab1", "Tab2"]),
+            tabs: TabsState::new(vec!["监控", "设置"]),
             show_chart: true,
             progress: 0.0,
             tasks: StatefulList::with_items(TASKS.to_vec()),
             logs: StatefulList::with_items(vec![]),
             signals: Signals {
-                sin1: Signal {
-                    source: sin_signal,
-                    points: sin1_points,
-                    tick_rate: 5,
-                },
-                sin2: Signal {
-                    source: sin_signal2,
-                    points: sin2_points,
-                    tick_rate: 10,
-                },
-                window: [0.0, 20.0],
+                data1: vec![],
+                data2: vec![],
+                window: [0.0, 180.0],
             },
+            speed_list: StatefulList::with_items(vec![]),
+            temp_list: StatefulList::with_items(vec![]),
             barchart_temp: vec![],
             barchart_speed: vec![],
             servers: vec![

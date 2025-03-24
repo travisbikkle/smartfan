@@ -1,3 +1,4 @@
+use std::fmt::format;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -35,13 +36,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
 fn draw_first_tab(frame: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::vertical([
-        Constraint::Length(9),
-        Constraint::Min(8),
-        Constraint::Length(7),
+        Constraint::Percentage(60),
+        Constraint::Percentage(40),
     ])
     .split(area);
-    draw_charts(frame, app, chunks[1]);
-    draw_text(frame, chunks[2]);
+    draw_charts(frame, app, chunks[0]);
+    draw_text(frame, app, chunks[1]);
 }
 
 #[allow(clippy::too_many_lines)]
@@ -60,49 +60,37 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
                     .split(chunks[0]);
 
-            // Draw tasks
+            // Draw temperature
             let tasks: Vec<ListItem> = app
-                .tasks
+                .temp_list
                 .items
                 .iter()
-                .map(|i| ListItem::new(vec![text::Line::from(Span::raw(*i))]))
+                .map(|(time, value)| ListItem::new(vec![text::Line::from(Span::raw(format!("{} {}℃", time, value)))]))
                 .collect();
             let tasks = List::new(tasks)
-                .block(Block::bordered().title("List"))
+                .block(Block::bordered().title("温度/Temperature"))
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD))
                 .highlight_symbol("> ");
             frame.render_stateful_widget(tasks, chunks[0], &mut app.tasks.state);
 
-            // Draw logs
-            let info_style = Style::default().fg(Color::Blue);
-            let warning_style = Style::default().fg(Color::Yellow);
-            let error_style = Style::default().fg(Color::Magenta);
-            let critical_style = Style::default().fg(Color::Red);
-            let logs: Vec<ListItem> = app
-                .logs
+            // Draw temperature
+            let tasks: Vec<ListItem> = app
+                .speed_list
                 .items
                 .iter()
-                .map(|&(level, ref event)| {
-                    let s = match level {
-                        log::Level::Error => critical_style,
-                        log::Level::Warn => warning_style,
-                        _ => info_style,
-                    };
-                    let content = vec![text::Line::from(vec![
-                        Span::styled(format!("{level:<9}"), s),
-                        Span::raw(event),
-                    ])];
-                    ListItem::new(content)
-                })
+                .map(|(time, value)| ListItem::new(vec![text::Line::from(Span::raw(format!("{} {}%", time, value)))]))
                 .collect();
-            let logs = List::new(logs).block(Block::bordered().title("List"));
-            frame.render_stateful_widget(logs, chunks[1], &mut app.logs.state);
+            let tasks = List::new(tasks)
+                .block(Block::bordered().title("转速/Fan Speed"))
+                .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+                .highlight_symbol("> ");
+            frame.render_stateful_widget(tasks, chunks[1], &mut app.tasks.state);
         }
         let bar_chart_grouped_temp_data: &Vec<(&str, u64)> = &app.barchart_temp.iter().map(|(x, y)| (x.as_str(), *y)).collect();
         let barchart = BarChart::default()
-            .block(Block::bordered().title("Bar chart"))
+            .block(Block::bordered().title("各风扇转速/Each Fan Speed(RPM)"))
             .data(bar_chart_grouped_temp_data)
-            .bar_width(3)
+            .bar_width(5)
             .bar_gap(2)
             .bar_set(if app.enhanced_graphics {
                 symbols::bar::NINE_LEVELS
@@ -122,38 +110,49 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
     if app.show_chart {
         let x_labels = vec![
             Span::styled(
-                format!("{}", app.signals.window[0]),
+                " ",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::raw(format!(
-                "{}",
-                (app.signals.window[0] + app.signals.window[1]) / 2.0
-            )),
+            // config.interval
+            Span::raw(format!("共计约{:0}秒", (&app.signals.window[1] - &app.signals.window[0]) * 15.0)),
             Span::styled(
-                format!("{}", app.signals.window[1]),
+                "现在/Now",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
         ];
+
+        let temps = get_data_for_chart(&app.signals.data1, &app.signals.window);
+        let speeds = get_data_for_chart(&app.signals.data2, &app.signals.window);
+
+        let d1: &[(f64, f64)] = temps.as_slice();
+        let d2: &[(f64, f64)] = speeds.as_slice();
+        // println!("温度数据");
+        // for (x, y) in d1.iter().rev() {
+        //     if *x != 0.0 || *y != 0.0 {
+        //         print!("[{}:{}]", x, y);
+        //     }
+        // }
+
         let datasets = vec![
             Dataset::default()
-                .name("data2")
+                .name("转速%")
                 .marker(symbols::Marker::Dot)
                 .style(Style::default().fg(Color::Cyan))
-                .data(&app.signals.sin1.points),
+                .data(d2),
             Dataset::default()
-                .name("data3")
+                .name("温度℃")
                 .marker(if app.enhanced_graphics {
                     symbols::Marker::Braille
                 } else {
                     symbols::Marker::Dot
                 })
                 .style(Style::default().fg(Color::Yellow))
-                .data(&app.signals.sin2.points),
+                .data(d1),
         ];
         let chart = Chart::new(datasets)
             .block(
                 Block::bordered().title(Span::styled(
-                    "Chart",
+                    "历史/History",
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
@@ -161,62 +160,65 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             )
             .x_axis(
                 Axis::default()
-                    .title("X Axis")
+                    .title("时间/Time")
                     .style(Style::default().fg(Color::Gray))
                     .bounds(app.signals.window)
                     .labels(x_labels),
             )
             .y_axis(
                 Axis::default()
-                    .title("Y Axis")
+                    .title("温度temp/速度speed")
                     .style(Style::default().fg(Color::Gray))
-                    .bounds([-20.0, 20.0])
+                    .bounds([0.0, 100.0])
                     .labels([
-                        Span::styled("-20", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::raw("0"),
-                        Span::styled("20", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled("0", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::raw("50"),
+                        Span::styled("100", Style::default().add_modifier(Modifier::BOLD)),
                     ]),
             );
         frame.render_widget(chart, chunks[1]);
     }
 }
 
-fn draw_text(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        text::Line::from("This is a paragraph with several lines. You can change style your text the way you want"),
-        text::Line::from(""),
-        text::Line::from(vec![
-            Span::from("For example: "),
-            Span::styled("under", Style::default().fg(Color::Red)),
-            Span::raw(" "),
-            Span::styled("the", Style::default().fg(Color::Green)),
-            Span::raw(" "),
-            Span::styled("rainbow", Style::default().fg(Color::Blue)),
-            Span::raw("."),
-        ]),
-        text::Line::from(vec![
-            Span::raw("Oh and if you didn't "),
-            Span::styled("notice", Style::default().add_modifier(Modifier::ITALIC)),
-            Span::raw(" you can "),
-            Span::styled("automatically", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(" "),
-            Span::styled("wrap", Style::default().add_modifier(Modifier::REVERSED)),
-            Span::raw(" your "),
-            Span::styled("text", Style::default().add_modifier(Modifier::UNDERLINED)),
-            Span::raw(".")
-        ]),
-        text::Line::from(
-            "One more thing is that it should display unicode characters: 10€"
-        ),
-    ];
-    let block = Block::bordered().title(Span::styled(
-        "Footer",
-        Style::default()
-            .fg(Color::Magenta)
-            .add_modifier(Modifier::BOLD),
-    ));
-    let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
-    frame.render_widget(paragraph, area);
+fn get_data_for_chart(data: &Vec<(String, f64)>, window: &[f64; 2]) -> Vec<(f64, f64)> {
+
+    let length = window[1] - window[0];
+    let u_length = length as usize + 1;
+    let mut temp_data: Vec<(f64, f64)> = vec![(0., 0.); u_length];
+    for i in 0..u_length {
+        temp_data[i] = (i as f64, 0.0);
+    }
+
+    for (i, num) in data.iter().enumerate() {
+        temp_data[u_length - data.len() + i] = ((u_length - data.len() + i) as f64, num.1);
+    }
+    temp_data
+}
+
+fn draw_text(frame: &mut Frame, app: &mut App, area: Rect) {
+    let info_style = Style::default().fg(Color::Blue);
+    let warning_style = Style::default().fg(Color::Yellow);
+    let error_style = Style::default().fg(Color::Magenta);
+    let critical_style = Style::default().fg(Color::Red);
+    let logs: Vec<ListItem> = app
+        .logs
+        .items
+        .iter()
+        .map(|&(level, ref event)| {
+            let s = match level {
+                log::Level::Error => critical_style,
+                log::Level::Warn => warning_style,
+                _ => info_style,
+            };
+            let content = vec![text::Line::from(vec![
+                Span::styled(format!("{level:<9}"), s),
+                Span::raw(event),
+            ])];
+            ListItem::new(content)
+        })
+        .collect();
+    let logs = List::new(logs).block(Block::bordered().title("日志/Log"));
+    frame.render_stateful_widget(logs, area, &mut app.logs.state);
 }
 
 fn draw_second_tab(frame: &mut Frame, app: &mut App, area: Rect) {

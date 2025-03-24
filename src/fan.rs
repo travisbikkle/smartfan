@@ -3,8 +3,59 @@ use std::io::ErrorKind;
 use crate::{config, Message};
 use std::process::Command;
 use tokio::sync::mpsc::Sender;
+use crate::sensor::SensorResult;
+use regex::Regex;
 
-pub fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> io::Result<Option<(f64, u8)>> {
+pub fn get_active_cpu_num(sensor_results: &Vec<SensorResult>) -> (usize, usize) {
+    let mut num = 0;
+    let mut max_num = 2;
+    let cpu_re = Regex::new(r"(?i)(CPU|Processor|Proc)[_ ]?(\d+)").unwrap();
+    sensor_results.iter()
+        .filter(|&x|x.sensor_name.contains("Temp") && !x.sensor_name.contains("VR"))
+        .for_each(|x| {
+            if let Some(caps) = cpu_re.captures(&x.sensor_name) {
+                if let Some(num_str) = caps.get(2) {
+                    let current_id: usize = num_str.as_str().parse().unwrap();
+                    max_num = max_num.max(current_id);
+                    match x.value {
+                        Some(v) => {
+                            if v > 0.0 {
+                                num = num.max(current_id);
+                            }
+                        }
+                        None => ()
+                    }
+                }
+            }
+        });
+    (num, max_num)
+}
+
+pub fn get_max_temperature(sensor_results: &Vec<SensorResult>) -> f64 {
+    let mut max_temp = 0.0;
+    sensor_results.iter()
+        .filter(|&x| {x.sensor_name.contains("CPU") && x.sensor_name.contains("Temp")})
+        .for_each(|x| {
+            if x.value.is_some() && x.value.unwrap() > max_temp {
+                max_temp = x.value.unwrap();
+            }
+        });
+    max_temp
+}
+
+pub fn get_fans_speed(sensor_results: &Vec<SensorResult>) -> Vec<(String,f64)> {
+    let mut fan_speeds = Vec::new();
+    sensor_results.iter()
+        .filter(|&x| x.sensor_name.contains("FAN") && x.sensor_name.contains("Speed"))
+        .for_each(|x| {
+            let mut speed: f64 = 0.0;
+            if x.value.is_some() { speed = x.value.unwrap() };
+            fan_speeds.push((x.sensor_name.clone().replace("FAN", "").replace("_Speed", ""), speed));
+        });
+    fan_speeds
+}
+
+pub fn get_all_sensor_data(ipmi_tool_cmd: &str) -> io::Result<Vec<SensorResult>> {
     let cmd = format!("{} sensor", ipmi_tool_cmd);
     let output = if cfg!(target_os = "windows") {
         Command::new("cmd")
@@ -28,48 +79,19 @@ pub fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> io::Result<Option<(f6
 
     let output_str = String::from_utf8_lossy(&output.stdout);
     let lines = output_str.lines();
-    let mut temperatures = Vec::new();
-    let mut cpu_num = 2;
 
     // CPU1_Temp        | 34.000     | degrees C  | ok    | na        | na        | na        | 93.000    | 100.000   | 105.000
     // CPU2_Temp        | 0.000      | degrees C  | ok    | na        | na        | na        | 100.000   | 102.000   | 104.000
     // CPU1_VR_Temp     | 30.000     | degrees C  | ok    | na        | na        | na        | 112.000   | 123.000   | 133.000
     // CPU2_VR_Temp     | 15.000     | degrees C  | ok    | na        | na        | na        | 112.000   | 123.000   | 133.000
+    let mut sensor_data = vec![];
     for line in lines {
-        if line.is_empty() || !line.contains("CPU") || !line.contains("Temp") {
-            continue;
-        }
-
-        let parts: Vec<&str> = line.split('|').collect();
-        if parts.len() < 2 {
-            log::error!("Unexpected line format: {}", line);
-            continue;
-        }
-
-        let temp_str = parts[1].trim();
-        if temp_str == "na" {
-            log::info!("The system is off, temperature is na");
-            temperatures.push(0.0);
-            continue;
-        }
-
-        if let Some(temp) = extract_temperature(temp_str) {
-            temperatures.push(temp);
-            if line.contains("CPU2_Temp") && temp == 0.0 {
-                cpu_num = 1;
-            }
+        if let Ok(d) = SensorResult::from_line(line) {
+            sensor_data.push(d);
         }
     }
 
-    if temperatures.is_empty() {
-        return Err(io::Error::new(ErrorKind::Other, "No temperature data found."));
-    }
-
-    let max_temp = temperatures
-        .into_iter()
-        .fold(0.0, |acc, temp| if temp > acc { temp } else { acc });
-
-    Ok(Some((max_temp, cpu_num)))
+    Ok(sensor_data)
 }
 
 pub fn extract_temperature(temp_str: &str) -> Option<f64> {
@@ -82,15 +104,9 @@ pub fn extract_temperature(temp_str: &str) -> Option<f64> {
 pub fn set_fan_speed(
     speed: u8,
     ipmi_tool_cmd: &str,
-    cpu_num: u8,
+    cpu_num: usize,
     cpu2_fan_speed_set: &mut bool,
-) -> bool {
-    log::info!(
-        "CPU number is {}, CPU 2 fan turned off? {}",
-        cpu_num,
-        cpu2_fan_speed_set
-    );
-
+) -> io::Result<()> {
     let delimiter = if cfg!(target_os = "windows") {
         "&"
     } else {
@@ -113,7 +129,7 @@ pub fn set_fan_speed(
 
         cmd
     } else {
-        format!("{} raw 0x2e 0x30 00 00 {:02x}", ipmi_tool_cmd, speed)
+        format!("{} raw 0x2e 0x30 00 00 {}", ipmi_tool_cmd, speed)
     };
 
     let output = if cfg!(target_os = "windows") {
@@ -130,15 +146,10 @@ pub fn set_fan_speed(
     };
 
     if !output.status.success() {
-        log::error!(
-            "Error executing command: {}. Error: {}",
-            cmd,
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return false;
+        return Err(io::Error::new(ErrorKind::Other, format!("Error executing command: {}. Error: {}", cmd, String::from_utf8_lossy(&output.stderr))));
     }
 
-    true
+    Ok(())
 }
 
 pub fn get_fan_speed(temp: f64, fan_speeds: &[config::FanSpeed]) -> u8 {
