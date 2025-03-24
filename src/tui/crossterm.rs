@@ -83,7 +83,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Resu
                             app.logs.items.insert(0, (l, format!("{} {}", time, m)));
                         },
                         Message::GotCpuAndFansSpeed(time_str, (cpu, max_cpu), fans) => {
-                            app.barchart_speed.clear();
+                            app.barchart_temp.clear();
                             fans
                                 .iter()
                                 .for_each(|(fan_name, speed)|app.barchart_temp.push((fan_name.clone(), *speed as u64)))

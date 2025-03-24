@@ -71,7 +71,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 .block(Block::bordered().title("温度/Temperature"))
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD))
                 .highlight_symbol("> ");
-            frame.render_stateful_widget(tasks, chunks[0], &mut app.tasks.state);
+            frame.render_stateful_widget(tasks, chunks[0], &mut app.temp_list.state);
 
             // Draw temperature
             let tasks: Vec<ListItem> = app
@@ -84,7 +84,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 .block(Block::bordered().title("转速/Fan Speed"))
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD))
                 .highlight_symbol("> ");
-            frame.render_stateful_widget(tasks, chunks[1], &mut app.tasks.state);
+            frame.render_stateful_widget(tasks, chunks[1], &mut app.speed_list.state);
         }
         let bar_chart_grouped_temp_data: &Vec<(&str, u64)> = &app.barchart_temp.iter().map(|(x, y)| (x.as_str(), *y)).collect();
         let barchart = BarChart::default()

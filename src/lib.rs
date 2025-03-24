@@ -89,11 +89,17 @@ pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UI
                 let max_temperature = fan::get_max_temperature(&sensor_data);
                 let speed = fan::get_fan_speed(max_temperature, &config.fan_speeds);
                 let all_fans_speed = fan::get_fans_speed(&sensor_data);
-                send_to_ui.send(Message::build_log(Level::Info, format!("GotCpuAndFansSpeed, active cpu num: {}, max sockets num: {}, fans sensor num: {}", active_cpu_nums, max, all_fans_speed.len()))).await.expect("send message to ui successfully");
+
+                let fan_speed_str = all_fans_speed.iter()
+                    .map(|(name, speed)| format!("{}: {}", name, speed))
+                    .collect::<Vec<_>>()
+                    .join(", ");;
+
+                send_to_ui.send(Message::build_log(Level::Info, format!("GotCpuAndFansSpeed, active cpu num: {}, max sockets num: {}, fans: {}", active_cpu_nums, max, fan_speed_str))).await.expect("send message to ui successfully");
                 send_to_ui.send(Message::GotCpuAndFansSpeed(time_str.clone(), (active_cpu_nums, max), all_fans_speed)).await.expect("send message to ui successfully");
                 match fan::set_fan_speed(speed, &ipmi_tool_cmd, active_cpu_nums, &mut cpu2_fan_speed_set) {
                     Ok(()) => {
-                        send_to_ui.send(Message::build_log(Level::Info, format!("SetFanSpeed, temp: {}, speed: {}", max_temperature, speed))).await.expect("send message to ui successfully");
+                        send_to_ui.send(Message::build_log(Level::Info, format!("SetFanSpeed, temp: {}℃, speed: {}%", max_temperature, speed))).await.expect("send message to ui successfully");
                         send_to_ui.send(Message::SetFanSpeed(time_str, max_temperature, speed)).await.expect("send message to ui successfully");
                     }
                     Err(e) => {
