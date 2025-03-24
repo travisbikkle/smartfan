@@ -42,8 +42,8 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         with:
-          tag_name: 0.0.1
-          release_name: 0.0.1
+          tag_name: ${{ github.run_number }}
+          release_name: ${{ github.run_number }}
           draft: false
           prerelease: false
         env:
