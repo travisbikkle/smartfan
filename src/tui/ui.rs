@@ -82,16 +82,15 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 .logs
                 .items
                 .iter()
-                .map(|&(evt, level)| {
+                .map(|&(level, ref event)| {
                     let s = match level {
-                        "ERROR" => error_style,
-                        "CRITICAL" => critical_style,
-                        "WARNING" => warning_style,
+                        log::Level::Error => critical_style,
+                        log::Level::Warn => warning_style,
                         _ => info_style,
                     };
                     let content = vec![text::Line::from(vec![
                         Span::styled(format!("{level:<9}"), s),
-                        Span::raw(evt),
+                        Span::raw(event),
                     ])];
                     ListItem::new(content)
                 })
@@ -99,10 +98,10 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             let logs = List::new(logs).block(Block::bordered().title("List"));
             frame.render_stateful_widget(logs, chunks[1], &mut app.logs.state);
         }
-
+        let bar_chart_grouped_temp_data: &Vec<(&str, u64)> = &app.barchart_temp.iter().map(|(x, y)| (x.as_str(), *y)).collect();
         let barchart = BarChart::default()
             .block(Block::bordered().title("Bar chart"))
-            .data(&app.barchart)
+            .data(bar_chart_grouped_temp_data)
             .bar_width(3)
             .bar_gap(2)
             .bar_set(if app.enhanced_graphics {

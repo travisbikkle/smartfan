@@ -201,9 +201,10 @@ pub struct App<'a> {
     pub show_chart: bool,
     pub progress: f64,
     pub tasks: StatefulList<&'a str>,
-    pub logs: StatefulList<(&'a str, &'a str)>,
+    pub logs: StatefulList<(log::Level, String)>,
     pub signals: Signals,
-    pub barchart: Vec<(&'a str, u64)>,
+    pub barchart_speed: Vec<(String, u64)>,
+    pub barchart_temp: Vec<(String, u64)>,
     pub servers: Vec<Server<'a>>,
     pub enhanced_graphics: bool,
     pub event_receiver_from_ipmi: Receiver<crate::Message>,
@@ -228,7 +229,7 @@ impl<'a> App<'a> {
             show_chart: true,
             progress: 0.0,
             tasks: StatefulList::with_items(TASKS.to_vec()),
-            logs: StatefulList::with_items(LOGS.to_vec()),
+            logs: StatefulList::with_items(vec![]),
             signals: Signals {
                 sin1: Signal {
                     source: sin_signal,
@@ -242,7 +243,8 @@ impl<'a> App<'a> {
                 },
                 window: [0.0, 20.0],
             },
-            barchart: EVENTS.to_vec(),
+            barchart_temp: vec![],
+            barchart_speed: vec![],
             servers: vec![
                 Server {
                     name: "NorthAmerica-1",
@@ -305,17 +307,10 @@ impl<'a> App<'a> {
 
     pub fn on_tick(&mut self) {
         // Update progress
-        self.progress += 0.001;
-        if self.progress > 1.0 {
-            self.progress = 0.0;
-        }
-
-        self.signals.on_tick();
-
         let log = self.logs.items.pop().unwrap();
         self.logs.items.insert(0, log);
 
-        let event = self.barchart.pop().unwrap();
-        self.barchart.insert(0, event);
+        let event = self.barchart_temp.pop().unwrap();
+        self.barchart_temp.insert(0, event);
     }
 }

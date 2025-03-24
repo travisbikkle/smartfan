@@ -16,17 +16,16 @@ struct Cli {
     enhanced_graphics: bool,
 }
 
-pub async fn run_tui(
+pub fn run_tui(
     event_receiver_from_ipmi: Receiver<crate::Message>,
     ui_event_sender: Sender<crate::UIMessage>,
 ) -> Result<(), Box<dyn Error>> {
     let cli: Cli = argh::from_env();
     //let tick_rate = Duration::from_millis(cli.tick_rate);
-    crate::tui::crossterm::run(
+    crossterm::run(
         cli.enhanced_graphics,
         event_receiver_from_ipmi,
         ui_event_sender,
-    )
-    .await?;
+    ).expect("cross term run successfully");
     Ok(())
 }

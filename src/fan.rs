@@ -1,28 +1,29 @@
-use crate::config;
+use std::io;
+use std::io::ErrorKind;
+use crate::{config, Message};
 use std::process::Command;
+use tokio::sync::mpsc::Sender;
 
-pub fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> Option<(f64, u8)> {
+pub fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> io::Result<Option<(f64, u8)>> {
     let cmd = format!("{} sensor", ipmi_tool_cmd);
     let output = if cfg!(target_os = "windows") {
         Command::new("cmd")
             .args(&["/C", &cmd])
-            .output()
-            .expect("Failed to execute command")
+            .output()?
     } else {
         Command::new("sh")
             .arg("-c")
             .arg(&cmd)
-            .output()
-            .expect("Failed to execute command")
+            .output()?
     };
 
     if !output.status.success() {
-        log::error!(
+        let msg = format!(
             "Error executing command: {}. Error: {}",
             cmd,
             String::from_utf8_lossy(&output.stderr)
         );
-        return None;
+        return Err(io::Error::new(ErrorKind::Other, msg));
     }
 
     let output_str = String::from_utf8_lossy(&output.stdout);
@@ -61,15 +62,14 @@ pub fn get_temperature_and_cpu_num(ipmi_tool_cmd: &str) -> Option<(f64, u8)> {
     }
 
     if temperatures.is_empty() {
-        log::error!("No temperature data found.");
-        return None;
+        return Err(io::Error::new(ErrorKind::Other, "No temperature data found."));
     }
 
     let max_temp = temperatures
         .into_iter()
         .fold(0.0, |acc, temp| if temp > acc { temp } else { acc });
 
-    Some((max_temp, cpu_num))
+    Ok(Some((max_temp, cpu_num)))
 }
 
 pub fn extract_temperature(temp_str: &str) -> Option<f64> {

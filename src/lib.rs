@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::mpsc::{Receiver, Sender};
 use derive_more::Display;
+use log::Level;
 
 pub mod config;
 pub mod constants;
@@ -15,8 +16,8 @@ pub use constants::*;
 
 #[derive(Debug, Display)]
 pub enum Message {
-    #[display("Log: {}", _0)]
-    Log(String),     // log
+    #[display("{}: {}", _0, _1)]
+    Log(Level, String), // log
     #[display("Command: {}", _0)]
     Command(String), // error
     #[display("Ipmi: temp: {} speed {}", _0, _1)]
@@ -39,7 +40,7 @@ pub fn load_config(config_path: &str) -> config::Config {
     config
 }
 
-pub fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UIMessage>) {
+pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UIMessage>) {
     let in_band = false;
     // if in_band {
     //     log::info!("Running with in-band mode");
@@ -48,6 +49,10 @@ pub fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UIMessag
     // }
 
     let config_path = format!("{}/HR650X.yaml", std::env::current_dir().unwrap().display());
+    if !std::fs::metadata(config_path.clone()).is_ok() {
+        send_to_ui.send(Message::Log(Level::Error, format!("{} not exists.", config_path))).await.expect("send message to ui successfully");
+        return;
+    }
     let config: config::Config = load_config(&config_path);
 
     let ipmi_tool_cmd = if in_band {
@@ -62,20 +67,20 @@ pub fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UIMessag
     let mut cpu2_fan_speed_set = false;
 
     loop {
-        if let Some((temp, cpu_num)) = fan::get_temperature_and_cpu_num(&ipmi_tool_cmd) {
-            // show on tui monitor
-            let speed = fan::get_fan_speed(temp, &config.fan_speeds);
-            if fan::set_fan_speed(speed, &ipmi_tool_cmd, cpu_num, &mut cpu2_fan_speed_set) {
-                // show log on tui
-                //log::info!("Set fan speed to {}% for CPU temperature {}°C", speed, temp);
-                let c = send_to_ui.clone();
-                tokio::spawn(async move {
-                    let _ = c.send(Message::Ipmi(temp, speed)).await;
-                });
+        match fan::get_temperature_and_cpu_num(&ipmi_tool_cmd) {
+            Ok(Some((temp, cpu_num))) => {
+                let speed = fan::get_fan_speed(temp, &config.fan_speeds);
+                if fan::set_fan_speed(speed, &ipmi_tool_cmd, cpu_num, &mut cpu2_fan_speed_set) {
+                    // show log on tui
+                    //log::info!("Set fan speed to {}% for CPU temperature {}°C", speed, temp);
+                    send_to_ui.send(Message::Ipmi(temp, speed)).await.expect("send message to ui successfully");
+                }
             }
+            Err(e) => send_to_ui.send(Message::Log(Level::Error, e.to_string())).await.expect("send message to ui successfully"),
+            _ => { println!("fan: failed to get temperature and cpu number"); }
         }
         // tokio async
-        thread::sleep(Duration::from_secs(10));
+        tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
 

@@ -11,10 +11,12 @@ use ratatui::{
     Terminal,
 };
 
-use crate::{tui::app::App, tui::ui};
+use crate::{tui::app::App, tui::ui, Message};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::error::TryRecvError;
+use chrono::Local;
 
-pub async fn run(
+pub fn run(
     enhanced_graphics: bool,
     event_receiver_from_ipmi: Receiver<crate::Message>,
     ui_event_sender: Sender<crate::UIMessage>,
@@ -33,7 +35,7 @@ pub async fn run(
         event_receiver_from_ipmi,
         ui_event_sender,
     );
-    let app_result = run_app(&mut terminal, app).await;
+    let app_result = run_app(&mut terminal, app);
 
     // restore terminal
     disable_raw_mode()?;
@@ -51,9 +53,9 @@ pub async fn run(
     Ok(())
 }
 
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Result<()> {
     let mut last_tick = Instant::now();
-    let tick_rate = std::time::Duration::from_millis(250);
+    let tick_rate = std::time::Duration::from_millis(2500);
     loop {
 
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -73,16 +75,30 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io
                 }
             }
         }
-        match app.event_receiver_from_ipmi.try_recv() {
-            Ok(msg) => {
-                log::info!("Received message: {}", msg);
-            }
-            Err(e) => {
-                log::error!("Channel is closed or empty, {:?}", e);
-            }
-        }
+
         if last_tick.elapsed() >= tick_rate {
-            app.on_tick();
+            match app.event_receiver_from_ipmi.try_recv() {
+                Ok(msg) => {
+                    match msg {
+                        Message::Log(l, m) => {
+                            app.logs.items.insert(0, (l, m));
+                        },
+                        Message::Ipmi(temp, speed) => {
+                            let now = Local::now();
+                            // 将时间格式化为小时:分钟:秒
+                            let time_str = now.format("%H:%M:%S").to_string();
+                            app.barchart_temp.insert(0, (time_str.clone(), temp as u64));
+                            app.barchart_speed.insert(0, (time_str, speed as u64));
+                        },
+                        _ => {}
+                    }
+                }
+                Err(e) => match e {
+                    TryRecvError::Empty => {},
+                    TryRecvError::Disconnected => app.logs.items.insert(0, (log::Level::Error, "Shutdown".into())),
+                }
+            }
+            //app.on_tick();
             last_tick = Instant::now();
         }
         if app.should_quit {

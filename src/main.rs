@@ -9,14 +9,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (tx, rx) = mpsc::channel::<smartfan::Message>(100);
     let (ui_tx, ui_rx) = mpsc::channel::<smartfan::UIMessage>(100);
 
-    tokio::task::spawn_blocking(|| {
+    let _ = tokio::task::spawn(async {
         log::info!("initiating loop");
-        smartfan::init_loop(tx, ui_rx);
+        smartfan::init_loop(tx, ui_rx).await;
     });
 
-    let gui = tokio::task::spawn(async {
-        let _ = smartfan::tui::run_tui(rx, ui_tx).await;
-    });
-
-    Ok(gui.await?)
+    // Ok(ipmi_loop.await?)
+    smartfan::tui::run_tui(rx, ui_tx)
 }
