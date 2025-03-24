@@ -9,9 +9,9 @@ use log::Level;
 
 pub mod config;
 pub mod constants;
-pub mod fan;
-pub mod tui;
 pub mod sensor;
+pub mod tui;
+pub mod sensor_result;
 
 pub use constants::*;
 
@@ -24,7 +24,9 @@ pub enum Message {
     #[display("Ipmi: temp: {} speed {}", _0, _1)]
     SetFanSpeed(String, f64, u8),   // temperature, speed
     #[display("Ipmi: cpu: {} speed {}", _1.0, _2.len())]
-    GotCpuAndFansSpeed(String, (usize, usize), Vec<(String, f64)>),   // temperature, speed
+    GotCpuAndFansSpeed(String, (usize, usize), Vec<(String, f64)>),   // cpu, all fans
+    #[display("Ipmi: power: {}", _1.len())]
+    Power(String, Vec<(String, f64)>),   // 电耗
 }
 
 impl Message {
@@ -81,15 +83,15 @@ pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UI
     let mut cpu2_fan_speed_set = false;
 
     loop {
-        match fan::get_all_sensor_data(&ipmi_tool_cmd) {
+        match sensor::get_all_sensor_data(&ipmi_tool_cmd) {
             Ok(sensor_data) => {
                 let now = Local::now();
                 let time_str = now.format("%H:%M:%S").to_string();
-                let (active_cpu_nums, max) = fan::get_active_cpu_num(&sensor_data);
-                let max_temperature = fan::get_max_temperature(&sensor_data);
-                let speed = fan::get_fan_speed(max_temperature, &config.fan_speeds);
-                let all_fans_speed = fan::get_fans_speed(&sensor_data);
-
+                let (active_cpu_nums, max) = sensor::get_active_cpu_num(&sensor_data);
+                let max_temperature = sensor::get_max_temperature(&sensor_data);
+                let speed = sensor::get_fan_speed(max_temperature, &config.fan_speeds);
+                let all_fans_speed = sensor::get_fans_speed(&sensor_data);
+                // 风扇
                 let fan_speed_str = all_fans_speed.iter()
                     .map(|(name, speed)| format!("{}: {}", name, speed))
                     .collect::<Vec<_>>()
@@ -97,15 +99,19 @@ pub async fn init_loop(send_to_ui: Sender<Message>, receive_from_ui: Receiver<UI
 
                 send_to_ui.send(Message::build_log(Level::Info, format!("GotCpuAndFansSpeed, active cpu num: {}, max sockets num: {}, fans: {}", active_cpu_nums, max, fan_speed_str))).await.expect("send message to ui successfully");
                 send_to_ui.send(Message::GotCpuAndFansSpeed(time_str.clone(), (active_cpu_nums, max), all_fans_speed)).await.expect("send message to ui successfully");
-                match fan::set_fan_speed(speed, &ipmi_tool_cmd, active_cpu_nums, &mut cpu2_fan_speed_set) {
+                match sensor::set_fan_speed(speed, &ipmi_tool_cmd, active_cpu_nums, &mut cpu2_fan_speed_set) {
                     Ok(()) => {
                         send_to_ui.send(Message::build_log(Level::Info, format!("SetFanSpeed, temp: {}℃, speed: {}%", max_temperature, speed))).await.expect("send message to ui successfully");
-                        send_to_ui.send(Message::SetFanSpeed(time_str, max_temperature, speed)).await.expect("send message to ui successfully");
+                        send_to_ui.send(Message::SetFanSpeed(time_str.clone(), max_temperature, speed)).await.expect("send message to ui successfully");
                     }
                     Err(e) => {
                         send_to_ui.send(Message::build_log(Level::Error, e.to_string())).await.expect("send message to ui successfully");
                     }
                 }
+                // 电耗
+                let powers = sensor::get_power(&sensor_data);
+                send_to_ui.send(Message::build_log(Level::Info, format!("Power data got, length is {}", powers.len()))).await.expect("send message to ui successfully");
+                send_to_ui.send(Message::Power(time_str.clone(), powers)).await.expect("send message to ui successfully");
             }
             Err(e) => send_to_ui.send(Message::build_log(Level::Error, e.to_string())).await.expect("send message to ui successfully"),
         }

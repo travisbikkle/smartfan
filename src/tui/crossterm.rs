@@ -80,6 +80,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Resu
                 Ok(msg) => {
                     match msg {
                         Message::Log(time, l, m) => {
+                            if app.logs.items.len() > 50 {
+                                app.logs.items.pop();
+                            }
                             app.logs.items.insert(0, (l, format!("{} {}", time, m)));
                         },
                         Message::GotCpuAndFansSpeed(time_str, (cpu, max_cpu), fans) => {
@@ -104,10 +107,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App<'_>) -> io::Resu
                                 app.speed_list.items.pop();
                             }
                             app.speed_list.items.insert(0, (time_str.clone(), speed));
+
                             if app.temp_list.items.len() > 50 {
                                 app.temp_list.items.pop();
                             }
                             app.temp_list.items.insert(0, (time_str.clone(), temp));
+                        },
+                        Message::Power(time_str, vec) => {
+                            app.watt_list.items.clear();
+                            app.watt_list.items.extend(vec);
                         },
                         _ => {}
                     }

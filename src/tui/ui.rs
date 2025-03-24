@@ -57,8 +57,11 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             .split(chunks[0]);
         {
             let chunks =
-                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .split(chunks[0]);
+                Layout::horizontal([
+                    Constraint::Ratio(1, 3), // 第1列占1/3宽度
+                    Constraint::Ratio(1, 3), // 第2列占1/3宽度
+                    Constraint::Ratio(1, 3), // 第3列占1/3宽度
+                ]).split(chunks[0]);
 
             // Draw temperature
             let tasks: Vec<ListItem> = app
@@ -85,6 +88,19 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD))
                 .highlight_symbol("> ");
             frame.render_stateful_widget(tasks, chunks[1], &mut app.speed_list.state);
+
+            // Draw watt
+            let tasks: Vec<ListItem> = app
+                .watt_list
+                .items
+                .iter()
+                .map(|(name, value)| ListItem::new(vec![text::Line::from(Span::raw(format!("{: <5} {: >5.1} W", name, value)))]))
+                .collect();
+            let tasks = List::new(tasks)
+                .block(Block::bordered().title("电耗/Power"))
+                .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+                .highlight_symbol("> ");
+            frame.render_stateful_widget(tasks, chunks[2], &mut app.speed_list.state);
         }
         let bar_chart_grouped_temp_data: &Vec<(&str, u64)> = &app.barchart_temp.iter().map(|(x, y)| (x.as_str(), *y)).collect();
         let barchart = BarChart::default()

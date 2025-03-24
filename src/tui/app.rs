@@ -158,6 +158,7 @@ pub struct App<'a> {
     pub logs: StatefulList<(log::Level, String)>,
     pub speed_list: StatefulList<(String, u8)>,
     pub temp_list: StatefulList<(String, f64)>,
+    pub watt_list: StatefulList<(String, f64)>,
     pub signals: Signals,
     pub barchart_speed: Vec<(String, u64)>,
     pub barchart_temp: Vec<(String, u64)>,
@@ -189,6 +190,7 @@ impl<'a> App<'a> {
             },
             speed_list: StatefulList::with_items(vec![]),
             temp_list: StatefulList::with_items(vec![]),
+            watt_list: StatefulList::with_items(vec![]),
             barchart_temp: vec![],
             barchart_speed: vec![],
             servers: vec![
