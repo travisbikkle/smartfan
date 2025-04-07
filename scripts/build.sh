@@ -7,7 +7,7 @@ cargo build --release --target x86_64-unknown-linux-musl
 mkdir -p dist/linux
 cp target/x86_64-unknown-linux-musl/release/smartfan dist/linux/
 cp scripts/config.yaml dist/linux/
-cp scripts/install.sh dist/linux/
+cp scripts/*.sh dist/linux/
 cp scripts/*.txt dist/linux/
 cp LICENSE.txt dist/linux/
 cd dist/linux

@@ -4,10 +4,8 @@ if ! cat /etc/os-release|grep Debian;then
     exit 1
 fi
 
-if ! command -v ipmitool &>/dev/null;then
-    apt update
-    apt install -y ipmitool
-fi
+apt install -y ipmitool screen
+
 
 ## get current path
 current_path=$(cd `dirname $0`;pwd)
@@ -23,9 +21,10 @@ After=network.target
 Requires=network.target
 
 [Service]
-ExecStart=$current_path/smartfan
+ExecStart=$current_path/start_with_screen.sh # 没有用
 WorkingDirectory=$current_path
 Restart=always
+Fork=yes
 RestartSec=5
 User=root
 
