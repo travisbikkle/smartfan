@@ -1,3 +1,3 @@
-# 编译
+A fan control tui app for Lenovo HR650X.
 
-# 交叉编译
+![](docs/img/demo.png)
